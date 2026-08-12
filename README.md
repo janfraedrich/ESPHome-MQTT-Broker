@@ -12,13 +12,16 @@ This component acts as a bridge between ESPHome and [Espressif's port of the Mos
 
 > ⚠️ **This component is only available when using the ESP-IDF framework because the broker implementation used was designed for ESP-IDF.**
 
+Based on github://KuhlaJusa/ESPHome-MQTT-Broker
+Lizenz: GNU General Public License v3.0
+
 ## Installation
 
 To use this external component, add the following code to the YAML configuration.
 
 ```yaml
 external_components:
-  - source: github://KuhlaJusa/ESPHome-MQTT-Broker
+  - source: github://janfraedrich/ESPHome-MQTT-Broker
       components: [ mqtt_broker ]
 ```
 ## Configuration
