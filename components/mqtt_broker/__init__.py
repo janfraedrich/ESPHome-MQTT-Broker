@@ -52,7 +52,7 @@ CONFIG_SCHEMA = cv.All(
             },
         ),
     }),
-    cv.only_with_esp_idf,
+    cv.only_on_esp32,
     cv.require_framework_version(esp_idf=cv.Version(*MIN_IDF_VERSION)),
     cv.require_esphome_version(*MIN_ESPHOME_VERSION),
     cv.requires_component("network"),
@@ -78,7 +78,7 @@ async def to_code(config):
         add_idf_component(
             name="mosquitto",
             repo="https://github.com/espressif/esp-protocols.git",
-            ref="mosq-v2.0.20_3",
+            ref="mosq-v2.0.20_9",
             path="components/mosquitto"
             #submodules=["components/mosquitto/mosquitto"]
         )
