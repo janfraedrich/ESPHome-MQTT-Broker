@@ -39,7 +39,11 @@ The broker implementation requires IPv6, even if it is not in use. Therefore we 
 
 ### Variables:
 
-- **port** (Optional, int): Set the port number of the MQTT broker. Defaults to `1883`.  
+- **port** (Optional, int): Set the port number of the MQTT broker. Defaults to `1883`.
+
+- **tls** (Optional): Enable TLS transport for the broker. Certificates and keys are loaded from files on the device filesystem.
+  - **cert_file** (Required, string): Path to the PEM server certificate file.
+  - **key_file** (Required, string): Path to the PEM private key file.
 
 - **on_message_max_age** (Optional, Time (ms) or *'infinite'*): Only used, when *on_message Trigger* are given. For technical details take a look at [Technical Details](#technical-details). Defaults to `1000ms`
 
@@ -68,6 +72,21 @@ Just like the MQTT Component, it also supports multiple `on_message` trigger, by
 Not supported are the `qos` variable, which is not available and the second NOTE, meaning this component does not support the creation of triggers in lambdas.
 
 > ⚠️ Depending on `on_message_max_age` and `max_queue_elements`, there is no guarantee that each and every event will trigger.
+
+### TLS Configuration Example
+
+```yaml
+mqtt_broker:
+  port: 8883
+  tls:
+    cert_file: /spiffs/mqtt/server.crt.pem
+    key_file: /spiffs/mqtt/server.key.pem
+```
+
+The broker reads both files once during startup and keeps the loaded PEM data in RAM while running.
+Because the files are read from the filesystem, certificate/key rotation can be done independently from firmware updates.
+
+> ⚠️ The component expects PEM encoded certificate and key data.
 
 
 ## Technical Details
@@ -103,3 +122,4 @@ As the Broker-Task should run as uninterrupted as possible for a reliable MQTT o
 - [ESPHome MQTT Component](https://esphome.io/components/mqtt.html)
 - [ESPHome Network Component](https://esphome.io/components/network.html)
 - [Espressif's port of the Mosquitto MQTT broker](https://github.com/espressif/esp-protocols/tree/master/components/mosquitto)
+
