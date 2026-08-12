@@ -6,6 +6,7 @@
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <cstdio>
 
 
 namespace esphome {
@@ -60,23 +61,104 @@ void MQTTBroker::start_broker(void* pvParameter) {
     return;
   } 
 
+  if (global_instance_->tls_enabled_ &&
+      (global_instance_->tls_cfg_.servercert_buf == nullptr || global_instance_->tls_cfg_.serverkey_buf == nullptr)) {
+    ESP_LOGE(TAG, "TLS is enabled but broker TLS configuration is invalid. Broker will not start.");
+    return;
+  }
+
   int broker_return = 0;
 
   char ip[] = "0.0.0.0"; // Listen on all interfaces
   struct mosq_broker_config config = {
       .host = ip,         
       .port = global_instance_->port_,
-      .tls_cfg = NULL,    // No TLS
+      .tls_cfg = global_instance_->tls_enabled_ ? &global_instance_->tls_cfg_ : NULL,
       .handle_message_cb = global_instance_->enable_callback_ ? handle_message : nullptr
       };
 
-  ESP_LOGI(TAG, "Starting MQTT Broker on port: %d", config.port);
+  ESP_LOGI(TAG, "Starting MQTT Broker on port: %d%s", config.port,
+           global_instance_->tls_enabled_ ? " (TLS enabled)" : "");
   broker_return = mosq_broker_run(&config);     //broker only returns from this function if stopped
   ESP_LOGI(TAG, "MQTT Broker closed with code: %d", broker_return);
 }
 
+bool MQTTBroker::load_file_to_string_(const std::string &path, std::string &output) {
+  FILE *file = fopen(path.c_str(), "rb");
+  if (file == nullptr) {
+    ESP_LOGE(TAG, "Failed to open TLS file: %s", path.c_str());
+    return false;
+  }
+
+  if (fseek(file, 0, SEEK_END) != 0) {
+    ESP_LOGE(TAG, "Failed to seek TLS file: %s", path.c_str());
+    fclose(file);
+    return false;
+  }
+
+  long size = ftell(file);
+  if (size <= 0) {
+    ESP_LOGE(TAG, "TLS file is empty or invalid: %s", path.c_str());
+    fclose(file);
+    return false;
+  }
+
+  if (fseek(file, 0, SEEK_SET) != 0) {
+    ESP_LOGE(TAG, "Failed to rewind TLS file: %s", path.c_str());
+    fclose(file);
+    return false;
+  }
+
+  output.resize(static_cast<size_t>(size));
+  const size_t read_count = fread(output.data(), 1, output.size(), file);
+  fclose(file);
+
+  if (read_count != output.size()) {
+    ESP_LOGE(TAG, "Failed to fully read TLS file: %s", path.c_str());
+    output.clear();
+    return false;
+  }
+
+  // Ensure NUL termination for PEM parser compatibility while preserving exact byte count.
+  output.push_back('\0');
+  return true;
+}
+
+bool MQTTBroker::prepare_tls_config_() {
+  if (!this->tls_enabled_) {
+    return true;
+  }
+
+  if (this->tls_cert_file_.empty() || this->tls_key_file_.empty()) {
+    ESP_LOGE(TAG, "TLS requires both cert_file and key_file.");
+    return false;
+  }
+
+  if (!this->load_file_to_string_(this->tls_cert_file_, this->tls_cert_data_)) {
+    return false;
+  }
+  if (!this->load_file_to_string_(this->tls_key_file_, this->tls_key_data_)) {
+    return false;
+  }
+
+  this->tls_cfg_ = {};
+  this->tls_cfg_.servercert_buf = reinterpret_cast<const unsigned char *>(this->tls_cert_data_.c_str());
+  this->tls_cfg_.servercert_bytes = this->tls_cert_data_.size();
+  this->tls_cfg_.serverkey_buf = reinterpret_cast<const unsigned char *>(this->tls_key_data_.c_str());
+  this->tls_cfg_.serverkey_bytes = this->tls_key_data_.size();
+
+  ESP_LOGI(TAG, "TLS configured from files: cert=%s key=%s",
+           this->tls_cert_file_.c_str(), this->tls_key_file_.c_str());
+  return true;
+}
+
 void MQTTBroker::setup() {
   global_instance_ = this;
+
+  if (this->tls_enabled_ && !this->prepare_tls_config_()) {
+    ESP_LOGE(TAG, "Broker setup aborted due to TLS configuration error.");
+    return;
+  }
 
   if (enable_callback_)
     message_queue_ = xQueueCreate(10, sizeof(MQTTMessage*));
@@ -139,6 +221,11 @@ void MQTTBroker::loop() {
 void MQTTBroker::dump_config(){
   ESP_LOGCONFIG(TAG, "MQTT Broker:");
   ESP_LOGCONFIG(TAG, "  Port: %u", this->port_);
+  ESP_LOGCONFIG(TAG, "  TLS Enabled: %s", this->tls_enabled_ ? "YES" : "NO");
+  if (this->tls_enabled_) {
+    ESP_LOGCONFIG(TAG, "  TLS Cert File: %s", this->tls_cert_file_.c_str());
+    ESP_LOGCONFIG(TAG, "  TLS Key File: %s", this->tls_key_file_.c_str());
+  }
   ESP_LOGCONFIG(TAG, "  Max Queue Elements: %u", this->max_queue_elements_);
   ESP_LOGCONFIG(TAG, "  Max Message Age (ms): %u", this->max_message_age_ms_);
   ESP_LOGCONFIG(TAG, "  Debug Logging: %s", this->debug_ ? "ENABLED" : "DISABLED");

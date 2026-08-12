@@ -24,6 +24,9 @@ MIN_ESPHOME_VERSION = (2025, 7, 0)  # with 2025.7.0 'add_idf_component' automati
                                     # manually adding is going to break in 2026.1
 CONF_ON_MESSAGE_MAX_AGE = "on_message_max_age"
 CONF_ON_MAX_MESSAGES_IN_QUEUE = "max_queue_elements"
+CONF_TLS = "tls"
+CONF_CERT_FILE = "cert_file"
+CONF_KEY_FILE = "key_file"
 
 mqtt_broker_ns = cg.esphome_ns.namespace("mqtt_broker")
 MQTTBroker = mqtt_broker_ns.class_("MQTTBroker", cg.Component)
@@ -38,6 +41,12 @@ CONFIG_SCHEMA = cv.All(
         cv.GenerateID(): cv.declare_id(MQTTBroker),
         cv.Optional(CONF_PORT, default=1883): cv.port,
         cv.Optional(CONF_DEBUG, default=False): cv.boolean,
+        cv.Optional(CONF_TLS): cv.Schema(
+            {
+                cv.Required(CONF_CERT_FILE): cv.string_strict,
+                cv.Required(CONF_KEY_FILE): cv.string_strict,
+            }
+        ),
         cv.Optional(CONF_ON_MAX_MESSAGES_IN_QUEUE, default=10): cv.int_range(0, 65535),
         cv.Optional(CONF_ON_MESSAGE_MAX_AGE, default="1000ms"): cv.Any(
             cv.positive_time_period_milliseconds,
@@ -96,6 +105,12 @@ async def to_code(config):
     cg.add(var.set_max_message_age(interval))
 
     cg.add(var.set_debug(config[CONF_DEBUG]))
+
+    if (tls_cfg := config.get(CONF_TLS)) is not None:
+        cg.add(var.set_tls_enabled(True))
+        cg.add(var.set_tls_cert_file(tls_cfg[CONF_CERT_FILE]))
+        cg.add(var.set_tls_key_file(tls_cfg[CONF_KEY_FILE]))
+
     if config[CONF_DEBUG] or config.get(CONF_ON_MESSAGE) is not None:
         cg.add(var.enable_mqtt_callback(True))
 

@@ -6,6 +6,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "esphome/core/log.h"
+#include "esp_tls.h"
 
 
 
@@ -57,6 +58,11 @@ class MQTTBroker : public Component {
   // Sets the maximum number of messages the internal queue can hold.
   void set_max_queue_elements(uint16_t elements) { this->max_queue_elements_ = elements;}
 
+  // Enables TLS and sets PEM file paths for broker certificate and private key.
+  void set_tls_cert_file(const std::string &cert_file) { this->tls_cert_file_ = cert_file; }
+  void set_tls_key_file(const std::string &key_file) { this->tls_key_file_ = key_file; }
+  void set_tls_enabled(bool enabled) { this->tls_enabled_ = enabled; }
+
  protected:
 
   // Port on which the MQTT broker will listen (default 1883).
@@ -82,6 +88,23 @@ class MQTTBroker : public Component {
 
   // Determines if broker enable callback on messages.
   bool enable_callback_ = false;
+
+  // Enables TLS transport when certificate/key files are configured and readable.
+  bool tls_enabled_ = false;
+
+  // Paths to PEM files stored on the device filesystem.
+  std::string tls_cert_file_;
+  std::string tls_key_file_;
+
+  // Runtime-owned TLS material buffers, kept alive while broker is running.
+  std::string tls_cert_data_;
+  std::string tls_key_data_;
+
+  // TLS configuration passed to mosquitto broker.
+  esp_tls_cfg_server_t tls_cfg_ = {};
+
+  bool prepare_tls_config_();
+  bool load_file_to_string_(const std::string &path, std::string &output);
 
   // List of MQTTMessageTrigger objects that define rules for triggering actions on messages.
   std::vector<MQTTMessageTrigger*> triggers_;
