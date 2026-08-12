@@ -72,7 +72,7 @@ def has_network_ipv6():
 @coroutine_with_priority(40.0)
 async def to_code(config):
     has_network_ipv6()
-    if CORE.using_esp_idf and CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] >= cv.Version(
+    if CORE.is_esp32 and CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] >= cv.Version(
         *MIN_IDF_VERSION
     ):
         add_idf_component(
